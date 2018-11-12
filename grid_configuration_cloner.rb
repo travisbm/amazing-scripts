@@ -1,3 +1,10 @@
+sample_opportunity_id = 458	
+sample_grid_name = "Qualified"
+target_opportunity_ids = Opportunity::Encumberable.not_archived.map(&:id); nil
+default = true
+
+cloner = Support::GridConfigurationCloner.new(sample_opportunity_id, sample_grid_name, target_opportunity_ids, default)
+
 module Support
 	class GridConfigurationCloner
 		MODEL_TYPE = "Opportunity"
@@ -141,22 +148,15 @@ module Support
 			get_grid_configuration_form_field_ids
 
 			get_target_opportunities.each do |opportunity|
-				target_opportunity_form_field_ids = opportunity.questions.map(&:form_field_id)
-
-				difference_in_form_field_ids = @view_to_copy_form_field_ids - target_opportunity_form_field_ids
-
-				if difference_in_form_field_ids.empty? && filtering_on_category?
-					if opportunity.type == @sample_opportunity.type
-						@opportunity_ids_compatible << opportunity.id 
-					else
-						@opportunity_ids_not_compatible << [opportunity.id, opportunity.portfolio.name, difference_in_form_field_ids]
-					end
-				elsif difference_in_form_field_ids.empty?
-					@opportunity_ids_compatible << opportunity.id
-				else
-					@opportunity_ids_not_compatible << [opportunity.id, opportunity.portfolio.name, difference_in_form_field_ids]
-				end
+			next if opportunity.equal? @sample_opportunity
+			target_opportunity_form_field_ids = opportunity.questions.map(&:form_field_id)
+			difference_in_form_field_ids = @view_to_copy_form_field_ids - target_opportunity_form_field_ids
+			if difference_in_form_field_ids.empty?
+				@opportunity_ids_compatible << opportunity.id
+			else
+				@opportunity_ids_not_compatible << [opportunity.id, opportunity.portfolio.name, difference_in_form_field_ids]
 			end
+		end
 		end
 
 		def find_apply_to_questions_not_on_profile

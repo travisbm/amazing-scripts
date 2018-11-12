@@ -10,13 +10,13 @@ import_array = CSV.parse(import_text, :headers => true)
 updated = []
 skipped = []
 import_array.each do |row|
-	
+
 	user = User.find(row["Id"])
 	uid  = row["GOOD ID"]
 
 	if User.where(customer_uid: uid).present?
 		existing_user_with_uid = User.where(customer_uid: uid).first
-		
+
 		skipped_row = []
 		row.each do |data|
 			skipped_row << data[1]
@@ -28,7 +28,7 @@ import_array.each do |row|
 		user.save!
 		updated << user.id
 	end
-	
+
 end
 
 
@@ -49,7 +49,7 @@ import_array = CSV.parse(import_text, :headers => true)
 
 updated = []
 import_array.each do |row|
-	
+
 	user         = User.find(row["UserId#"])
 	uid          = row["BLAZERID"]
 	display_name = row["Display Name (First and Last Only)"]
@@ -81,7 +81,7 @@ import_array = CSV.parse(import_text, :headers => true)
 updated = []
 not_updated = []
 import_array.each do |row|
-	
+
 	user = User.where(email: row["email"]).first
 	if user.blank?
 		not_updated << [row["email"], row["customer_uid"]]
@@ -92,7 +92,7 @@ import_array.each do |row|
 		user.customer_uid = user.customer_uid.prepend("INACTIVE_")
 
 		updated << [user.id, user.display_name, user.email, user.customer_uid]
-	
+
 		user.save!
 	end
 end
@@ -106,7 +106,58 @@ not_updated.easy_csv("users_not_deactivated", headers, {direct_upload: false})
 
 
 
+path = "client/1492698710/LUC_InactivteUIDS.csv"
+
+s3_object = Datastores::S3.new(path)
+import_text = s3_object.read.eightball
+import_array = CSV.parse(import_text, :headers => true)
+
+updated = []
+import_array.each do |row|
+	user = User.where(customer_uid: row["customer_uid"]).first
+	user.email = user.customer_uid + "_dnu@" + Client.current + ".com"
+	user.save!
+	updated << [user.id, user.customer_uid, user.email]
+end
+
+headers = %w(user_id customer_uid email)
+
+updated.easy_csv("users_mass_deactivated", headers, {direct_upload: false})
 
 
+# update uid to dnu from file
+path = "client/1492700209/luc_users_mass_deactivated_2017Apr20_0956.csv"
+
+s3_object = Datastores::S3.new(path)
+import_text = s3_object.read.eightball
+import_array = CSV.parse(import_text, :headers => true)
+
+updated = []
+skipped = []
+import_array.each do |row|
+	user = User.find(row["user_id"])
+	deactivated_uid = user.customer_uid + "_dnu"
+	if user.customer_uid == deactivated_uid
+		skipped << [user.id, user.customer_uid, user.email]
+	elsif user.customer_uid.include?("_dnu")
+		skipped << [user.id, user.customer_uid, user.email]
+	else
+		user.customer_uid = deactivated_uid
+		# user.email = user.customer_uid + "_dnu@" + Client.current + ".com"
+		# user.save!
+		updated << [user.id, user.customer_uid, user.email]
+	end
+end
+
+headers = %w(user_id customer_uid email)
+
+report = updated + skipped
+
+report.easy_csv("users_mass_deactivated", headers, {direct_upload: false})
 
 
+diff.each do |id|
+  user = User.find(id)
+  user.customer_uid = user.customer_uid.sub("_dnu", "")
+	user.save!
+end
